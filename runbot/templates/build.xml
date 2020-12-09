@@ -13,12 +13,6 @@
               </t>
             </div>
           </form>
-          <form class="form-inline" t-attf-action="/runbot/build/#{build['id']}/force" method='POST' t-if="request.params.get('ask_rebuild')" groups="runbot.group_user">
-            <a href='#' class="btn btn-danger" data-runbot="rebuild" t-attf-data-runbot-build="#{build['id']}">
-              <i class='fa fa-refresh'/>
-              Force Rebuild
-            </a>
-          </form>
         </t>
         <div class="row">
           <div class="col-md-12">

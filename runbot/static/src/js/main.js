@@ -1,7 +1,7 @@
 const { Component } = owl;
 const { xml } = owl.tags;
 const { whenReady } = owl.utils;
-const { useState } = owl.hooks;
+const { useState, useRef } = owl.hooks;
 
 get_color_class = function(build) {
 
@@ -91,7 +91,7 @@ class CopyButton extends Component {
 const BUILD_MENU_TEMPLATE = `
 <t>
     <button t-attf-class="btn btn-default dropdown-toggle" data-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false">
-        <i t-attf-class="fa {{build.global_state == 'pending' ? 'fa-spinner' : 'fa-cog'}} {{('done', 'running').indexOf(build.global_state) == -1 ? '' : 'fa-spin'}} fa-fw"/>
+        <i t-attf-class="fa {{build.global_state == 'pending' ? 'fa-spinner' : 'fa-cog'}} {{['done', 'running'].indexOf(build.global_state) == -1 ? '' : 'fa-spin'}} fa-fw"/>
         <span class="caret"/>
     </button>
     <div class="dropdown-menu dropdown-menu-right" role="menu">
@@ -168,15 +168,6 @@ const BUILD_MENU_TEMPLATE = `
     </div>
 </t>`;
 
-
-/*class BuildMenu extends Component {
-    static template = BUILD_MENU_TEMPLATE;
-    willStart() {
-        this.build=this.props.build;
-    }
-}*/
-
-
 const SLOT_BUTTON_TEMPLATE = xml /* xml */`
 <div t-attf-class="btn-group btn-group-ssm slot_button_group">
     <span t-attf-class="btn btn-{{color}} disabled" t-att-title="slot.link_type">
@@ -222,7 +213,7 @@ const BATCH_TILE_TEMPLATE = xml /* xml */`
             <t t-foreach="displayableSlots" t-as="slot" t-key="slot.id">
                 <SlotButton class="slot_container" slot="slot"/>
             </t>
-            <div class="slot_filler" t-foreach="Array(10).keys()" t-as="x" t-key="x"/>
+            <div class="slot_filler" t-foreach="[1, 2, 3, 4]" t-as="x" t-key="x"/>
         </div>
         <div class="batch_commits">
             <div t-foreach="commit_links" t-as="commit_link" class="one_line" t-key="commit_link.id">
@@ -331,7 +322,7 @@ class BundlesList extends Component {
 }
 
 const APP_TEMPLATE = xml /* xml */`
-<div id="wrapwrap">
+<div>
     <header>
         <nav class="navbar navbar-expand-md navbar-light bg-light">
             <a t-attf-href="/runbot/{{project.slug}}">
@@ -361,18 +352,18 @@ const APP_TEMPLATE = xml /* xml */`
                         </t>
                         <t t-else="">
                             <t t-if="nb_assigned_errors and nb_assigned_errors > 0">
-                                <li class="nav-item divider"/>
                                 <li class="nav-item">
                                     <a href="/runbot/errors" class="nav-link text-danger" t-attf-title="You have {{nb_assigned_errors}} random bug assigned">
                                         <i class="fa fa-bug"/><t t-esc="nb_assigned_errors"/>
                                     </a>
                                 </li>
+                                <li class="nav-item divider"/>
                             </t>
                             <t t-elif="nb_build_errors and nb_build_errors > 0">
-                                <li class="nav-item divider"/>
                                 <li class="nav-item">
                                     <a href="/runbot/errors" class="nav-link" title="Random Bugs"><i class="fa fa-bug"/></a>
                                 </li>
+                                <li class="nav-item divider"/>
                             </t>
                             <li class="nav-item dropdown">
                                 <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
@@ -390,16 +381,57 @@ const APP_TEMPLATE = xml /* xml */`
                     <li class="nav-item"><a class="nav-link" href="/doc">FAQ</a></li><!--todo this is a custom xpath-->
                 </ul>
                     
-                <div class="form-inline my-2 my-lg-0" role="search">
-                    <div class="input-group md-form form-sm form-2 pl-0">
-                        <input class="form-control my-0 py-1 red-border" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search.value" t-on-keyup="updateFilter"/>
+                <div>
+                    <div class="input-group input-group-sm">
+                        <div class="input-group-prepend input-group-sm">
+                            <button class="btn btn-default fa fa-cog" t-on-click="toggleSettings" title="Settings"/>
+                            <button class="btn btn-default" t-on-click="toggleMore">
+                                More
+                            </button>
+                            <select t-if="categories and categories.length > 1" class="custom-select" name="category" id="category">
+                                <option t-foreach="categories" t-as="category" t-att-value="category.id" t-esc="category.name" t-att-selected="category.id==active_category_id"/>
+                            </select>
+                        </div>
+                        
+                        <input class="form-control" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search.value" t-on-keyup="updateFilter" t-on-change="updateFilter" t-ref="search_input"/>
                         <div class="input-group-append">
+                            <button class="btn btn-default fa fa-eraser" t-on-click="clearSearch"/>
                         </div>
                     </div>
                 </div>
             </div>
         </nav>
     </header>
+    <div class="container-fluid d-none" t-ref="settings_menu">
+        <div class="row">
+            <div class="form-group col-md-4">
+                <h5>Search options</h5>
+                <input class="form-control" type="text" name="default_search" id="default_search" t-att-checked="default_search" placeholder="Default search"/>
+            </div>
+            <div class="form-group col-md-4">
+                <h5>Display options</h5>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="display_sticky"/>
+                    <label class="form-check-label" for="display_sticky">Display sticky</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="display_dev"/>
+                    <label class="form-check-label" for="display_dev">Display dev</label>
+                </div>
+            </div>
+            <div class="form-group col-md-4">
+                <h5>Triggers</h5>
+                <t t-if="triggers">
+                    <t t-foreach="triggers" t-as="trigger" t-key="trigger.id">
+                        <div t-if="!trigger.manual and trigger.project_id === project.id and trigger.category_id === active_category_id" class="form-check">
+                            <input class="form-check-input" type="checkbox" t-attf-name="trigger_{{trigger.id}}" t-attf-id="trigger_{{trigger.id}}" t-att-checked="trigger_display[trigger.id]"/>
+                            <label class="form-check-label" t-attf-for="trigger_{{trigger.id}}" t-esc="trigger.name"/>
+                        </div>
+                    </t>
+                </t>
+            </div>
+        </div>
+    </div>
 
     <div class="container-fluid frontend">
         <div class="row">
@@ -438,7 +470,13 @@ class App extends Component {
     load_infos = base_data.load_infos;
     nb_build_errors = base_data.nb_build_errors;
     nb_assigned_errors = base_data.nb_assigned_errors;
+    active_category_id = base_data.default_category_id; // todo should be used localy
+    categories = base_data.categories;
+    triggers = base_data.triggers;
     update_timeout = 0
+    settings_menu = useRef("settings_menu")
+    search_input = useRef("search_input")
+    trigger_display = {}
     fetch(path, data, then) {
         const xhttp = new XMLHttpRequest();
         xhttp.onreadystatechange = function() {
@@ -490,11 +528,15 @@ class App extends Component {
         this.update_timeout = setTimeout(this.updateBundles.bind(this), delay)
     }
     updateFilter(ev) { //todo t-model
-        this.search.value = ev.target.value
+        this.search.value = this.search_input.el.value
         this.debounceUpdate(500)
-        if (ev.keyCode === 13) {
+        if (ev && ev.keyCode === 13) {
             this.updateBundles();
         }
+    }
+    clearSearch() {
+        this.search_input.el.value = "";
+        this.updateFilter();
     }
     selectProject(project) {
         this.bundles.dev = []
@@ -502,11 +544,17 @@ class App extends Component {
         this.project=project;
         this.updateBundles();
     }
+    toggleSettings() {
+        this.settings_menu.el.classList.toggle("d-none");
+    }
     loadSettings() {
 
     }
     updateSettings() {
 
+    }
+    toggleMore() {
+        Component.env.options.more = ! Component.env.options.more;
     }
 }
 
